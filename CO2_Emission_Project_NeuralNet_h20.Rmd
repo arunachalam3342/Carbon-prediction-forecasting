@@ -1,0 +1,245 @@
+---
+title: "Project"
+output: html_document
+date: "2022-10-25"
+---
+
+```{r}
+dataset=read.csv('CO2_Emissions.csv')
+head(dataset)
+data=dataset[4:11]
+#view(dataset)
+library(tidyverse)
+library(neuralnet)
+library(GGally)
+
+```
+```{r}
+ggpairs(data,title="Scatter plot for engine size and cylinders features of the dataset",columns=1:2)
+ggpairs(data,title='Scatter plot for fuel consumptions',columns=5:8)
+
+```
+```{r}
+for(i in 1:11)
+{
+  a<-unlist(as.vector(dataset[i]))
+  b<-unlist(as.vector(dataset[12]))
+  if(class(a)=="integer" || class(a)=="numeric")
+  {
+    print(names(dataset[i]))
+    print(cor(a,b,method="pearson"))
+    
+  }
+}
+  
+#scale the data using normalization
+scale01<- function(x){
+  (x-min(x))/(max(x)-min(x))
+}
+
+
+```
+
+```{r}
+#check for any missing values in columns
+lapply(dataset,function(x) sum(is.na(x))) %>% str()
+
+#find the categorical columns in the dataset
+lapply(dataset,function(x) unique(as.vector(x))) %>% str()
+
+```
+```{r}
+#scale the integer or numeric features
+dataset[c(4,5,8,9,10,11,12)]<-dataset[c(4,5,8,9,10,11,12)] %>% mutate_all(scale01)
+
+#drop the make and model column as it has more categories and its irrelavant to target
+dataset$Make<-NULL
+dataset$Model<-NULL
+head(dataset)
+
+#group the categorical to numerical data
+class=as.vector(unique(dataset$Vehicle.Class))
+range_vechile=c(1:length(class))
+dataset$Vehicle.Class=factor(dataset$Vehicle.Class,levels=class,labels=range_vechile)
+
+trans=as.vector(unique(dataset$Transmission))
+range_trans=c(1:length(trans))
+dataset$Transmission=factor(dataset$Transmission,levels=trans,labels=range_trans)
+
+fuel=as.vector(unique(dataset$Fuel.Type))
+range_fuel=c(1:length(fuel))
+dataset$Fuel.Type=factor(dataset$Fuel.Type,levels=fuel,labels=range_fuel)
+
+```
+
+```{r}
+#encoding the categorical data using one-hot encoding
+#instal.packages("recipes")
+
+vech<-as.vector(unlist(unique(dataset$Vehicle.Class)))
+
+library(recipes)
+dataset$Vehicle.Class=as.numeric(dataset$Vehicle)
+dataset<-recipe(CO2.Emissions.g.km. ~ .,dataset) %>% step_num2factor(Vehicle.Class,levels= vech) %>% step_dummy(Vehicle.Class, one_hot = TRUE) %>% prep() %>% bake(new_data=NULL)
+
+trans<-as.vector(unique(dataset$Transmission))
+dataset$Transmission=as.numeric(dataset$Transmission)
+dataset<-recipe(CO2.Emissions.g.km. ~ .,dataset) %>% step_num2factor(Transmission,levels= trans) %>% step_dummy(Transmission, one_hot=TRUE) %>% prep() %>% bake(new_data=NULL)
+
+fuel<-as.vector(unique(dataset$Fuel.Type))
+dataset$Fuel.Type<-as.numeric(dataset$Fuel.Type)
+dataset<-recipe(CO2.Emissions.g.km. ~ .,dataset) %>% step_num2factor(Fuel.Type,levels= fuel) %>% step_dummy(Fuel.Type, one_hot=TRUE) %>% prep() %>% bake(new_data=NULL)
+
+glimpse(dataset)
+
+#write.csv(dataset,"Preprocesed_data.csv",row.names=FALSE)
+
+
+```
+```{r}
+#split into train and test set
+set.seed(12345)
+train_data<-sample_frac(tbl=dataset,replace=FALSE,size=0.80)
+test_data<-anti_join(dataset,train_data)
+cat("Rows of train data ",nrow(train_data))
+cat("\nRows of test data",nrow(test_data))
+
+#regression ann using neuralnet
+#1-Nueron
+set.seed(12321)
+n<-names(train_data)
+f<-as.formula(paste("CO2.Emissions.g.km. ~",paste(n[!n %in% "CO2.Emissions.g.km."], collapse=" + ")))
+data_nn1<-neuralnet(f,data=train_data)
+
+#to compute sse
+ind<-which(names(train_data)=="CO2.Emissions.g.km.")
+train_data[,ind]=as.numeric(unlist(train_data[,ind]))
+print(class(data_nn1$net.result))
+pred=as.numeric(unlist(data_nn1$net.result))
+nn1_train_sse<-sum((pred-train_data[,ind])^2)/2
+paste("SSE: ",round(nn1_train_sse,4))
+
+ind_test<-which(names(test_data)=="CO2.Emissions.g.km.")
+test_nn1_output<-compute(data_nn1,test_data[,-c(ind_test)])$net.result
+nn1_test_sse<-sum((test_nn1_output-test_data[,ind_test])^2)/2
+paste("SSE of test data ",round(nn1_test_sse,4))
+
+
+```
+```{r}
+#setting up gregression hyperparameters
+set.seed(12321)
+#2-hidden layers, layer-1 36-neurons and layer-2 1- neuron
+data_nn2<-neuralnet(f,data=train_data,hidden=c(36,1))
+
+#sse
+pred=as.numeric(unlist(data_nn2$net.result))
+nn2_train_sse<-sum((pred-train_data[,ind])^2)/2
+paste("SSE: ",round(nn2_train_sse,4))
+
+test_nn2_output<-compute(data_nn2,test_data[,-c(ind_test)])$net.result
+nn2_test_sse<-sum((test_nn2_output-test_data[,ind_test])^2)/2
+paste("SSE of test data ",round(nn2_test_sse,4))
+
+
+```
+```{r}
+#3-hidden layers, layer-1 36 neuron and layer-2 24 neuron 
+set.seed(12321)
+data_nn3<-neuralnet(f,data=train_data,hidden=c(36,24,1))
+
+#sse
+pred=as.numeric(unlist(data_nn3$net.result))
+nn3_train_sse<-sum((pred-train_data[,ind])^2)/2
+paste("SSE: ",round(nn3_train_sse,4))
+
+test_nn3_output<-compute(data_nn3,test_data[,-c(ind_test)])$net.result
+nn3_test_sse<-sum((test_nn3_output-test_data[,ind_test])^2)/2
+paste("SSE of test data ",round(nn3_test_sse,4))
+
+
+```
+
+```{r}
+#4-hidden layers, layer-1 36 neuron, layer-2 24 neuron , layer-3 16-neuron
+set.seed(12321)
+data_nn4<-neuralnet(f,data=train_data,hidden=c(36,24,16,1))
+
+#sse
+pred=as.numeric(unlist(data_nn4$net.result))
+nn4_train_sse<-sum((pred-train_data[,ind])^2)/2
+paste("SSE: ",round(nn4_train_sse,4))
+
+test_nn4_output<-compute(data_nn4,test_data[,-c(ind_test)])$net.result
+nn4_test_sse<-sum((test_nn4_output-test_data[,ind_test])^2)/2
+paste("SSE of test data ",round(nn4_test_sse,4))
+
+
+```
+```{r}
+# Bar plot of results
+Regression_NN_Errors <- tibble(Network = rep(c("NN1", "NN2", "NN3", "NN4"), each = 2), 
+                               DataSet = rep(c("Train", "Test"), time = 4), 
+                               SSE = c(nn1_train_sse,nn1_test_sse, 
+                                       nn2_train_sse,nn2_test_sse, 
+                                       nn3_train_sse,nn3_test_sse, 
+                                       nn4_train_sse,nn4_test_sse))
+
+```
+```{r}
+Regression_NN_Errors %>% 
+  ggplot(aes(Network, SSE, fill = DataSet)) + 
+  geom_col(position = "dodge") + 
+  ggtitle("Regression ANN's SSE") #NN3 perform well compare to others
+
+```
+```{r}
+#as NN3 performs better than other models we will predict the values 
+#inverse scale
+inv_scale<-function(x){
+  new_data<-read.csv('CO2_Emissions.csv')
+  (x *(max(new_data[12])-min(new_data[12])) + min(new_data[12]))
+}
+pred_df<-as.data.frame(test_nn3_output)
+real_df<-as.data.frame(test_data$CO2.Emissions.g.km.)
+pred_df<-pred_df %>% mutate_all(inv_scale)
+real_df<-real_df %>% mutate_all(inv_scale)
+df<-cbind(pred_df,real_df)
+colnames(df)<-c("Prediction","Real")
+View(df)
+```
+
+```{r}
+#using h2o package for DNN
+#install.packages("h2o")
+library(h2o)
+h2o.init(nthreads=-1)
+```
+```{r}
+regressor=h2o.deeplearning(y='CO2.Emissions.g.km.',
+                            training_frame = as.h2o(train_data),
+                            activation = 'Rectifier',
+                            hidden=c(36,24),
+                            epochs=100)
+```
+```{r}
+prob_pred= h2o.predict(regressor, newdata = as.h2o(test_data[-c(ind_test)]))
+y_pred=as.factor(prob_pred$predict)
+y_pred=as.vector(y_pred)
+```
+```{r}
+y_pred<-as.data.frame(y_pred)
+y_pred[1]<-as.numeric(unlist(y_pred[1]))
+y_pred<-y_pred %>% mutate_all(inv_scale)
+newdf<-cbind(real_df,pred_df,y_pred)
+colnames(newdf)<-c("Real","Predicted(neural net)","Predicted(h20)")
+View(newdf)
+```
+
+
+```{r}
+h2o.shutdown()
+```
+
+
+
