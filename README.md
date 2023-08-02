@@ -7,7 +7,9 @@ Team Members:
 3. ARUNACHALAM V 20BRS1067
 4. SAI TEJA BANDARU 20BRS1129
 
-Packages to install:
+Packages to install are mentioned in the requirement.txt
+
+Important packages are: 
 1. tensorflow
 2. rpy2
 3. pandas
@@ -15,4 +17,4 @@ Packages to install:
 5. streamlit
 
 
-Type the command in terminal "streamlit run application.py" to open the GUI
+Type the command in the terminal "streamlit run application.py" to open the GUI
