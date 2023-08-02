@@ -87,6 +87,7 @@ urllib3==1.26.16
 validators==0.20.0
 watchdog==3.0.0
 Werkzeug==2.3.6
+wheel==0.41.0
 wrapt==1.15.0
 yarg==0.1.9
 zipp==3.16.2
